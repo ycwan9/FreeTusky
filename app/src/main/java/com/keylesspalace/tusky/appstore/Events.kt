@@ -18,3 +18,4 @@ data class PreferenceChangedEvent(val preferenceKey: String) : Dispatchable
 data class MainTabsChangedEvent(val newTabs: List<TabData>) : Dispatchable
 data class PollVoteEvent(val statusId: String, val poll: Poll) : Dispatchable
 data class NewNotificationEvent(val notification: Notification) : Dispatchable
+data class NewHomeTimelineStatusEvent(val status: Status) : Dispatchable
