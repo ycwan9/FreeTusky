@@ -44,6 +44,7 @@ import com.keylesspalace.tusky.appstore.MainTabsChangedEvent;
 import com.keylesspalace.tusky.appstore.ProfileEditedEvent;
 import com.keylesspalace.tusky.components.conversation.ConversationsRepository;
 import com.keylesspalace.tusky.db.AccountEntity;
+import com.keylesspalace.tusky.di.ProfileStreamingListenerProvider;
 import com.keylesspalace.tusky.entity.Account;
 import com.keylesspalace.tusky.interfaces.ActionButtonActivity;
 import com.keylesspalace.tusky.interfaces.ReselectableFragment;
@@ -61,6 +62,7 @@ import com.mikepenz.materialdrawer.model.PrimaryDrawerItem;
 import com.mikepenz.materialdrawer.model.ProfileDrawerItem;
 import com.mikepenz.materialdrawer.model.ProfileSettingDrawerItem;
 import com.mikepenz.materialdrawer.model.SecondaryDrawerItem;
+import com.mikepenz.materialdrawer.model.ToggleDrawerItem;
 import com.mikepenz.materialdrawer.model.interfaces.IDrawerItem;
 import com.mikepenz.materialdrawer.model.interfaces.IProfile;
 import com.mikepenz.materialdrawer.util.AbstractDrawerImageLoader;
@@ -106,8 +108,9 @@ public final class MainActivity extends BottomSheetActivity implements ActionBut
     @Inject
     ConversationsRepository conversationRepository;
     @Inject
-    public ProfileStreamListener streamingListener;
+    public ProfileStreamingListenerProvider streamingListenerProvider;
 
+    private ProfileStreamListener profileStreamListener;
     private FloatingActionButton composeButton;
     private AccountHeader headerResult;
     private Drawer drawer;
@@ -120,6 +123,10 @@ public final class MainActivity extends BottomSheetActivity implements ActionBut
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        profileStreamListener = streamingListenerProvider.get(this);
+        this.profileStreamListener.resume();
+
 
         if (accountManager.getActiveAccount() == null) {
             // will be redirected to LoginActivity by BaseActivity
@@ -332,7 +339,7 @@ public final class MainActivity extends BottomSheetActivity implements ActionBut
         DrawerImageLoader.init(new AbstractDrawerImageLoader() {
             @Override
             public void set(ImageView imageView, Uri uri, Drawable placeholder, String tag) {
-                if(animateAvatars) {
+                if (animateAvatars) {
                     Glide.with(MainActivity.this)
                             .load(uri)
                             .placeholder(placeholder)
@@ -354,6 +361,10 @@ public final class MainActivity extends BottomSheetActivity implements ActionBut
         });
 
         List<IDrawerItem> listItems = new ArrayList<>(10);
+        listItems.add(new ToggleDrawerItem().withChecked(true).withName("Streaming").withSelectable(false).withOnCheckedChangeListener((d, iv, checked) -> {
+            if (checked) this.profileStreamListener.resume();
+            else this.profileStreamListener.stop();
+        }));
         listItems.add(new PrimaryDrawerItem().withIdentifier(DRAWER_ITEM_EDIT_PROFILE).withName(R.string.action_edit_profile).withSelectable(false).withIcon(GoogleMaterial.Icon.gmd_person));
         listItems.add(new PrimaryDrawerItem().withIdentifier(DRAWER_ITEM_FAVOURITES).withName(R.string.action_view_favourites).withSelectable(false).withIcon(GoogleMaterial.Icon.gmd_star));
         listItems.add(new PrimaryDrawerItem().withIdentifier(DRAWER_ITEM_LISTS).withName(R.string.action_lists).withSelectable(false).withIcon(GoogleMaterial.Icon.gmd_list));
@@ -477,7 +488,7 @@ public final class MainActivity extends BottomSheetActivity implements ActionBut
 
     private void changeAccount(long newSelectedId, @Nullable Intent forward) {
         cacheUpdater.stop();
-        streamingListener.stop();
+        profileStreamListener.stop();
         accountManager.setActiveAccount(newSelectedId);
 
         Intent intent = new Intent(this, MainActivity.class);
