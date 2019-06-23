@@ -56,7 +56,7 @@ class ViewImageFragment : ViewMediaFragment() {
         photoActionsListener = context as PhotoActionsListener
     }
 
-    override fun setupMediaView(url: String) {
+    override fun setupMediaView(url: String, previewUrl: String?) {
         descriptionView = mediaDescription
         photoView.transitionName = url
         attacher = PhotoViewAttacher(photoView)
@@ -77,7 +77,7 @@ class ViewImageFragment : ViewMediaFragment() {
             result
         }
 
-        loadImageFromNetwork(url, photoView)
+        loadImageFromNetwork(url, previewUrl, photoView)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -103,7 +103,7 @@ class ViewImageFragment : ViewMediaFragment() {
             }
         }
 
-        finalizeViewSetup(url, description)
+        finalizeViewSetup(url, attachment?.previewUrl, description)
     }
 
     private fun onMediaTap() {
@@ -131,23 +131,56 @@ class ViewImageFragment : ViewMediaFragment() {
         super.onDestroyView()
     }
 
-    private fun loadImageFromNetwork(url: String, photoView: ImageView) =
-            //Request image from the any cache
+    private fun loadImageFromNetwork(url: String, previewUrl: String?, photoView: ImageView) =
+    // Request image from the any cache
+    // If it fails, try to load preview from cache. Irregardless of the preview result,
+            // load the full image.
             Glide.with(this)
                     .load(url)
                     .dontAnimate()
                     .onlyRetrieveFromCache(true)
                     .error(
-                            //Request image from the network on fail load image from cache
-                            Glide.with(this)
-                                    .load(url)
-                                    .centerInside()
-                                    .addListener(ImageRequestListener(false))
+                            if (previewUrl != null) {
+                                Glide.with(this)
+                                        .load(previewUrl)
+                                        .centerInside()
+                                        .onlyRetrieveFromCache(true)
+                                        .addListener(PreviewRequestListener(photoView, url))
+                            } else {
+                                //Request image from the network on fail load image from cache
+                                Glide.with(this)
+                                        .load(url)
+                                        .centerInside()
+                                        .addListener(ImageRequestListener(false))
+                            }
                     )
                     .centerInside()
                     .addListener(ImageRequestListener(true))
                     .into(photoView)
 
+    inner class PreviewRequestListener(private val photoView: ImageView,
+                                       private val url: String) : RequestListener<Drawable> {
+        override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?,
+                                  isFirstResource: Boolean): Boolean {
+            return false
+        }
+
+        override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?,
+                                     dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+            // Can't manipulate loads from callbacks so do it on the UI thread
+            photoView.post {
+                Glide.with(this@ViewImageFragment)
+                        .load(url)
+                        .centerInside()
+                        .addListener(ImageRequestListener(false))
+                        .placeholder(resource)
+                        .into(photoView)
+                completeTransition()
+            }
+
+            return true
+        }
+    }
 
     /**
      * @param isCacheRequest - is this listener for request image from cache or from the network
