@@ -27,7 +27,7 @@ script:
 before_deploy:
   - wget -O - $KEYSTORE_URL | gpg -d --passphrase $KEYSTORE_PASSPHRASE -o keystore.jks
   - >
-    ./gradlew assembleGreenRelease
+    ./gradlew assembleGreenRelease assembleBlueRelease
     -Pandroid.injected.signing.store.file=$PWD/keystore.jks
     -Pandroid.injected.signing.store.password=$STORE_PASSWORD
     -Pandroid.injected.signing.key.alias=android-key
